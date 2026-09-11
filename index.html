@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZK Simülatörü</title>
+    
+    <!-- PWA / Web App Manifest Meta Etiketleri -->
+    <meta name="theme-color" content="#1E40AF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ZK Simülatörü">
+    <link rel="icon" type="image/png" href="app-icon.png">
+    <link rel="apple-touch-icon" href="app-icon.png">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22ZK%20Sim%C3%BClat%C3%B6r%C3%BC%22%2C%22short_name%22%3A%22ZK%20Sim%C3%BClat%C3%B6r%C3%BC%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23F3F4F6%22%2C%22theme_color%22%3A%22%231E40AF%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22app-icon.png%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1E40AF', // Blue 800
+                        secondary: '#3B82F6', // Blue 500
+                        success: '#10B981', // Emerald 500
+                        danger: '#EF4444', // Red 500
+                        background: '#F3F4F6', // Gray 100
+                        card: '#FFFFFF',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        
+        /* Smooth transitions */
+        .input-transition {
+            transition: all 0.3s ease;
+        }
+        
+        /* Tab Styles */
+        .tab-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .tab-active {
+            border-bottom: 2px solid #10B981;
+            color: #047857;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            color: #6B7280;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-inactive:hover {
+            color: #374151;
+            border-bottom: 2px solid #D1D5DB;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 text-center md:text-left flex flex-col">
+            <!-- Logo Bloğu (Mavi Çerçevenin Dışında ve Sola Yaslı) -->
+            <div class="mb-4 flex items-center justify-center md:justify-start">
+                <img src="logo.png" alt="ALM Sims Logo" class="w-auto h-12 object-contain" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzFFNDBBRiI+PHBhdGggZD0iTTEyIDJMMiA3bDEwIDUgMTAtNS0xMC01ek0yIDE3bDEwIDUgMTAtNXYtNWwtMTAgNS0xMC01djV6Ii8+PC9zdmc+'">
+            </div>
+            
+            <!-- Başlık Kutusu (Mavi Çerçeve) -->
+            <div class="bg-primary rounded-2xl shadow-lg p-6 w-full text-left">
+                <h1 class="text-3xl font-bold text-white mb-2">
+                    Zorunlu Karşılık Simülatörü
+                </h1>
+                <p class="text-blue-200 font-medium">Yükümlülük türüne göre maliyetleri analiz edin.</p>
+                <p class="text-blue-100 font-medium text-gray-400">Beta Sürümü (v2_110926)</p>
+
+            </div>
+        </header>
+
+        <div class="mb-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- PARAMETRELER PANELİ -->
+            <div class="lg:col-span-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow-md border border-gray-200 p-0 overflow-hidden flex flex-col">
+                <div class="p-6 pb-0">
+                    <h2 class="text-xl font-semibold mb-2 text-gray-800">
+                        <i class="fa-solid fa-vault text-emerald-600 mr-2"></i>Yükümlülük Analizi
+                    </h2>
+                    <p class="text-xs text-gray-600 mb-4">Zorunlu karşılık (ZK) maliyetini ve bileşik fonlama yükünü ölçün.</p>
+                </div>
+                
+                <div class="flex border-b border-gray-200 px-6">
+                    <button id="tab-tl-btn" class="tab-btn tab-active py-2 px-4 focus:outline-none flex-1 text-center" onclick="switchTab('tl')">
+                        <i class="fa-solid fa-lira-sign mr-1"></i> TL Yükümlülük
+                    </button>
+                    <button id="tab-yp-btn" class="tab-btn tab-inactive py-2 px-4 focus:outline-none flex-1 text-center" onclick="switchTab('yp')">
+                        <i class="fa-solid fa-dollar-sign mr-1"></i> YP Yükümlülük
+                    </button>
+                </div>
+
+                <div class="p-6 flex-grow">
+                    
+                    <!-- ORTAK GİRDİLER -->
+                    <div class="space-y-4 mb-4">
+                        
+                        <!-- Yükümlülük Türü Seçimi (Dinamik) -->
+                        <div>
+                            <label for="liabilityType" class="block text-sm font-medium text-gray-700 mb-1">Yükümlülük Türü</label>
+                            <div class="relative rounded-md shadow-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i class="fa-solid fa-list text-gray-400"></i>
+                                </div>
+                                <select id="liabilityType" class="input-transition block w-full pl-10 sm:text-sm border-gray-300 rounded-md py-2 border focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white">
+                                    <!-- Seçenekler JavaScript tarafından doldurulacak -->
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="depAmount" class="block text-sm font-medium text-gray-700 mb-1">Tutar (Anapara)</label>
+                            <div class="relative rounded-md shadow-sm">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <span class="text-gray-500 sm:text-sm font-bold" id="currency-symbol">₺</span>
+                                </div>
+                                <input type="number" id="depAmount" value="100000" min="1" required
+                                    class="input-transition block w-full pl-8 pr-12 sm:text-sm border-gray-300 rounded-md py-2 border focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="depInterest" class="block text-sm font-medium text-gray-700 mb-1">Yıllık Basit Maliyet (Nominal %) </label>
+                            <div class="relative rounded-md shadow-sm">
+                                <input type="number" id="depInterest" value="38" min="0" step="0.1" required
+                                    class="input-transition block w-full pr-8 sm:text-sm border-gray-300 rounded-md py-2 px-3 border focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white">
+                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                    <span class="text-gray-500 sm:text-sm">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="depDays" class="block text-sm font-medium text-gray-700 mb-1">Vade (Gün)</label>
+                                <div class="relative rounded-md shadow-sm">
+                                    <input type="number" id="depDays" value="32" min="1" max="365" required
+                                        class="input-transition block w-full pr-10 sm:text-sm border-gray-300 rounded-md py-2 px-3 border focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white">
+                                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 text-xs">Gün</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="depTax" class="block text-sm font-medium text-gray-700 mb-1">Stopaj / Vergi (%)</label>
+                                <div class="relative rounded-md shadow-sm">
+                                    <input type="number" id="depTax" value="17.5" min="0" max="100" step="0.1" required
+                                        class="input-transition block w-full pr-8 sm:text-sm border-gray-300 rounded-md py-2 px-3 border focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white">
+                                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 text-xs">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- TL SEKME ÖZEL -->
+                    <div id="tab-tl-content" class="tab-content active pt-4 border-t border-gray-200">
+                        <div class="space-y-4">
+                            <div>
+                                <label for="depReserveRatioTL" class="block text-sm font-medium text-red-700 mb-1">
+                                    <i class="fa-solid fa-building-columns mr-1"></i> TL ZK Oranı (%)
+                                </label>
+                                <div class="relative rounded-md shadow-sm">
+                                    <input type="number" id="depReserveRatioTL" value="17" min="0" max="100" step="0.5" required
+                                        class="input-transition block w-full pr-8 sm:text-sm border-red-300 rounded-md py-2 px-3 border focus:ring-red-500 focus:border-red-500 outline-none bg-white">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 sm:text-sm">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="depAofm" class="block text-sm font-medium text-orange-600 mb-1">
+                                    <i class="fa-solid fa-percent mr-1"></i> TCMB AOFM (%)
+                                </label>
+                                <div class="relative rounded-md shadow-sm">
+                                    <input type="number" id="depAofm" value="37" min="0" max="100" step="0.5" required
+                                        class="input-transition block w-full pr-8 sm:text-sm border-orange-300 rounded-md py-2 px-3 border focus:ring-orange-500 focus:border-orange-500 outline-none bg-white">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 sm:text-sm">%</span>
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-gray-500 mt-1">TL ZK'ya AOFM'nin %86'sı oranında nema ödenir.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- YP SEKME ÖZEL -->
+                    <div id="tab-yp-content" class="tab-content pt-4 border-t border-gray-200">
+                        <div class="space-y-4">
+                            <div>
+                                <label for="depReserveRatioYP" class="block text-sm font-medium text-red-700 mb-1">
+                                    <i class="fa-solid fa-building-columns mr-1"></i> YP ZK Oranı (%)
+                                </label>
+                                <div class="relative rounded-md shadow-sm">
+                                    <input type="number" id="depReserveRatioYP" value="28" min="0" max="100" step="0.5" required
+                                        class="input-transition block w-full pr-8 sm:text-sm border-red-300 rounded-md py-2 px-3 border focus:ring-red-500 focus:border-red-500 outline-none bg-white">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 sm:text-sm">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="depYpCommision" class="block text-sm font-medium text-red-600 mb-1">
+                                    <i class="fa-solid fa-hand-holding-dollar mr-1"></i> TCMB YP ZK Komisyonu (%)
+                                </label>
+                                <div class="relative rounded-md shadow-sm">
+                                    <input type="number" id="depYpCommision" value="0.0" min="0" max="10" step="0.1" required
+                                        class="input-transition block w-full pr-8 sm:text-sm border-red-300 rounded-md py-2 px-3 border focus:ring-red-500 focus:border-red-500 outline-none bg-white">
+                                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                        <span class="text-gray-500 sm:text-sm">%</span>
+                                    </div>
+                                </div>
+                                <p class="text-[10px] text-gray-500 mt-1">Merkez Bankası'nın YP blokaj üzerinden bankadan kestiği ek komisyon/maliyet (Varsa).</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ZK BİLGİ TABLOSU VE DİPNOTLAR -->
+                    <div class="mt-6 p-3 bg-slate-50 border border-slate-200 rounded-md shadow-sm">
+                        <h4 id="zkTableTitle" class="text-xs font-bold text-slate-700 mb-2 border-b border-slate-200 pb-1.5 flex items-center">
+                            <i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Standart Mevduat ZK Oranları(*)(**)
+                        </h4>
+                        <table class="w-full text-[10px] text-left text-slate-600 mb-2">
+                            <thead class="bg-slate-100 text-slate-800">
+                                <tr>
+                                    <th class="py-1.5 px-2 rounded-tl-md">Vade Aralığı</th>
+                                    <th class="py-1.5 px-2 text-center">TL (%)</th>
+                                    <th class="py-1.5 px-2 text-center rounded-tr-md">YP (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="zkTableBody" class="divide-y divide-slate-100">
+                                <!-- JS Dolduracak -->
+                            </tbody>
+                        </table>
+                        
+                        <!-- Eklenen Dipnotlar Bölümü (ID Eklendi) -->
+                        <div id="zkTableFootnotes" class="mt-2 pt-2 border-t border-slate-200 text-[9px] leading-tight text-slate-500 space-y-1">
+                            <p><strong class="text-slate-600">(*)</strong> Yurt içi bankalar, resmi ve kamu haznedarlığı kapsamındaki mevduatlar ZK'ya tabi değildir.</p>
+                            <p><strong class="text-slate-600">(**)</strong> Yurt dışı banka mevduatları ile diğer yükümlülükler için vadelerine göre farklı ZK oranları uygulanmaktadır.</p>
+                        </div>
+                    </div>
+
+                    <!-- STOPAJ BİLGİ TABLOSU -->
+                    <div class="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-md shadow-sm">
+                        <h4 class="text-xs font-bold text-slate-700 mb-2 border-b border-slate-200 pb-1.5 flex items-center">
+                            <i class="fa-solid fa-receipt text-emerald-500 mr-1.5"></i> Stopaj Oranları
+                        </h4>
+                        <table class="w-full text-[10px] text-left text-slate-600">
+                            <thead class="bg-slate-100 text-slate-800">
+                                <tr>
+                                    <th class="py-1.5 px-2 rounded-tl-md">Yükümlülük Türü / Vade</th>
+                                    <th class="py-1.5 px-2 text-center">TL (%)</th>
+                                    <th class="py-1.5 px-2 text-center rounded-tr-md">YP (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr>
+                                    <td class="py-1.5 px-2">Mevduat (<= 180 Gün)</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">17.5</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">17.5</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1.5 px-2">Mevduat (181 - 365 Gün)</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">15</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">15</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1.5 px-2">Mevduat (> 365 Gün)</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">10</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">10</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-1.5 px-2">Repo / Kıymetli Maden</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">15</td>
+                                    <td class="py-1.5 px-2 text-center font-semibold">15</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- ANALİZ SONUÇLARI PANELİ -->
+            <div class="lg:col-span-8 bg-card rounded-xl shadow-md border border-gray-100 p-6 flex flex-col justify-start">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800">Maliyet Analizi</h3>
+                    <div class="flex items-center gap-3">
+                        <span id="active-currency-badge" class="px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded">TL Analizi</span>
+                        <button id="exportDepositBtn" class="text-sm text-emerald-600 hover:text-emerald-800 transition-colors flex items-center font-medium bg-emerald-50 px-3 py-1.5 rounded-md border border-emerald-100 hover:bg-emerald-100">
+                            <i class="fa-solid fa-file-excel mr-2"></i> Raporu İndir
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Period Returns -->
+                    <div class="p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center">
+                        <div class="flex justify-between items-end mb-2">
+                            <div>
+                                <p class="text-xs font-medium text-gray-500 mb-1">Dönemlik Brüt Oran</p>
+                                <p class="text-xl font-bold text-gray-700" id="resGrossPeriodRate">%0.00</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs font-medium text-emerald-600 mb-1">Dönemlik Net Oran</p>
+                                <p class="text-xl font-bold text-emerald-600" id="resNetPeriodRate">%0.00</p>
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-1.5 mb-1 mt-2">
+                            <div class="bg-emerald-500 h-1.5 rounded-full" style="width: 100%"></div>
+                        </div>
+                        <p class="text-[10px] text-gray-400 text-center mt-1"><span id="resPeriodTextDays">32</span> günlük oranlar (Actual/365)</p>
+                    </div>
+
+                    <!-- Net Interest Amount -->
+                    <div class="text-center p-4 bg-gray-50 rounded-lg border border-gray-100 flex flex-col justify-center items-center">
+                        <p class="text-sm font-medium text-gray-500 mb-2">Dönemlik Net Tutar</p>
+                        <p class="text-3xl font-bold text-emerald-600" id="resNetInterestAmount">₺0.00</p>
+                        <p class="text-xs text-gray-400 mt-1">Vade Sonu Ödenecek Net Tutar</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <!-- Gross EAR -->
+                    <div class="text-center p-5 bg-blue-50 rounded-lg border border-blue-200 shadow-sm relative overflow-hidden">
+                        <div class="absolute -left-4 -bottom-4 opacity-10">
+                            <i class="fa-solid fa-chart-pie text-8xl text-blue-500"></i>
+                        </div>
+                        <p class="text-sm font-medium text-blue-800 mb-2 relative z-10">Efektif Yıllık Brüt Oran</p>
+                        <p class="text-3xl font-extrabold text-blue-600 relative z-10" id="resGrossEarRate">%0.00</p>
+                        <p class="text-xs text-blue-700 mt-2 relative z-10">Vergi Öncesi Yıllık Bileşik Oran</p>
+                    </div>
+
+                    <!-- Net EAR -->
+                    <div class="text-center p-5 bg-emerald-50 rounded-lg border border-emerald-200 shadow-sm relative overflow-hidden">
+                        <div class="absolute -right-4 -top-4 opacity-10">
+                            <i class="fa-solid fa-chart-line text-8xl text-emerald-500"></i>
+                        </div>
+                        <p class="text-sm font-medium text-emerald-800 mb-2 relative z-10">Efektif Yıllık Net Oran</p>
+                        <p class="text-4xl font-extrabold text-emerald-600 relative z-10" id="resNetEarRate">%0.00</p>
+                        <p class="text-xs text-emerald-700 mt-2 relative z-10">Vergi Sonrası Net Yıllık Bileşik Oran</p>
+                    </div>
+                </div>
+
+                <!-- Reserve Requirement Cost Section -->
+                <div class="bg-red-50 rounded-lg border border-red-200 p-5 shadow-sm mt-2">
+                    <h4 class="text-sm font-semibold text-red-800 border-b border-red-200 pb-2 mb-4 flex items-center justify-between">
+                        <span><i class="fa-solid fa-scale-unbalanced text-red-600 mr-2"></i> Zorunlu Karşılık Etkisi<span>
+                        <span id="zk-info-badge" class="text-xs font-normal bg-orange-100 text-orange-800 px-2 py-1 rounded border border-orange-200">
+                            Nema Oranı: <strong id="resNemaRate">%0.00</strong>
+                        </span>
+                    </h4>
+                    
+                    <div class="bg-white rounded p-4 border border-red-200 shadow-sm">
+                        <p class="text-sm font-semibold text-gray-700 mb-4 border-b border-gray-100 pb-2 text-center">
+                            Maliyete Oransal Etki (Yıllık Basit)
+                        </p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-center divide-y md:divide-y-0 md:divide-x divide-gray-100">
+                            <div class="pt-2 md:pt-0 flex flex-col justify-center">
+                                <p class="text-[11px] text-gray-500 font-semibold mb-1 tracking-wider">Brüt ZK Yükü</p>
+                                <p class="text-xl font-bold text-red-500" id="resZkMaliyetBrut">%0.00</p>
+                            </div>
+                            <div class="pt-2 md:pt-0 flex flex-col justify-center" id="nema-commission-box">
+                                <p class="text-[11px] text-gray-500 font-semibold mb-1  tracking-wider" id="nema-commission-title">Nema Getirisi Etkisi</p>
+                                <p class="text-xl font-bold text-emerald-500" id="resZkNemaEtkisi">%0.00</p>
+                            </div>
+                            <div class="pt-2 md:pt-0 bg-red-50/50 rounded-r-md p-2 flex flex-col justify-center border-l-2 border-red-200">
+                                <p class="text-[12px] text-gray-800 font-bold mb-1  tracking-wider">Net ZK Yükü</p>
+                                <p class="text-2xl font-black text-red-700" id="resZkMaliyetNet">%0.00</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Toplam Fonlama Maliyeti (Hazine) -->
+                    <div class="mt-5 pt-5 border-t border-red-200">
+                        <h4 class="text-sm font-bold text-red-900 mb-3 text-center">Toplam Fonlama Maliyeti</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Toplam Basit Maliyet -->
+                            <div class="bg-white rounded-lg p-3 border border-red-100 shadow-sm text-center">
+                                <p class="text-xs font-medium text-red-500 mb-1">Toplam Basit Maliyet</p>
+                                <p class="text-2xl font-extrabold text-red-700" id="resTotalSimpleCost">%0.00</p>
+                                <p class="text-[10px] text-gray-400 mt-1">Brüt Faiz + Net Basit ZK Yükü</p>
+                            </div>
+                            <!-- Toplam Bileşik (EAR) Maliyet -->
+                            <div class="bg-white rounded-lg p-3 border border-red-100 shadow-sm text-center">
+                                <p class="text-xs font-medium text-red-500 mb-1">Toplam Bileşik Maliyet </p>
+                                <p class="text-2xl font-extrabold text-red-700" id="resTotalEarCost">%0.00</p>
+                                <p class="text-[10px] text-gray-400 mt-1">Efektif Brüt + Net Bileşik ZK Yükü</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+                <div class="mt-4 text-[11px] text-gray-500 bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-start gap-3">
+                    <i class="fa-solid fa-circle-info text-blue-500 mt-0.5 text-lg"></i>
+                    <p id="zk-explanation-text" class="leading-relaxed">
+                        <strong>Net ZK Yükü:</strong> Bankanın brüt fonlama maliyetine ZK nedeniyle eklenen oransal yüktür. 
+                        TCMB'nin ZK'ya ödediği nema, kullanılamayan tutarın yarattığı maliyeti kısmen telafi eder. 
+                        <br><span class="inline-block mt-1 bg-white px-2 py-1 rounded border border-gray-100">Formül: <code>(Faiz Oranı - (ZK Oranı * Nema Oranı)) / (1 - ZK Oranı) - Faiz Oranı</code></span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        // Global state
+        let currentDepositType = 'tl'; // 'tl' or 'yp'
+
+        const formatCurrency = (value, currency = null) => {
+            let cur = currency;
+            if (!cur) {
+                cur = currentDepositType === 'tl' ? 'TRY' : 'USD';
+            }
+            
+            return new Intl.NumberFormat('tr-TR', { 
+                style: 'currency', 
+                currency: cur,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(value);
+        };
+
+        // Yükümlülük Seçenekleri Tanımları (Kıymetli Maden sadece YP'de!)
+        const liabilityOptions = {
+            'tl': [
+                { value: 'standart_mevduat', text: 'Standart Mevduat (Gerçek / Tüzel)' },
+                { value: 'yurtici_bankalar', text: 'Yurt İçi Bankalar' },
+                { value: 'kamu_haznedarligi', text: 'Resmi ve Kamu Haznedarlığı' },
+                { value: 'yurtici_repo', text: 'Yurtiçi Repo' },
+                { value: 'yurtdisi_banka_mevduati', text: 'Yurtdışı Banka Mevduatı' },
+                { value: 'yurtdisi_repo_kredi', text: 'Yurtdışı Repo / Kredi' },
+                { value: 'diger', text: 'Diğer Yükümlülükler' }
+            ],
+            'yp': [
+                { value: 'standart_mevduat', text: 'Standart Mevduat (Gerçek / Tüzel)' },
+                { value: 'kiymetli_maden', text: 'Kıymetli Maden Depo Hesapları' },
+                { value: 'yurtici_bankalar', text: 'Yurt İçi Bankalar' },
+                { value: 'kamu_haznedarligi', text: 'Resmi ve Kamu Haznedarlığı' },
+                { value: 'yurtici_repo', text: 'Yurtiçi Repo' },
+                { value: 'yurtdisi_banka_mevduati', text: 'Yurtdışı Banka Mevduatı' },
+                { value: 'yurtdisi_repo_kredi', text: 'Yurtdışı Repo / Kredi' },
+                { value: 'diger', text: 'Diğer Yükümlülükler' }
+            ]
+        };
+
+        // Dropdown'ı sekme türüne göre dolduran fonksiyon
+        const populateLiabilityDropdown = (type) => {
+            const selectEl = document.getElementById('liabilityType');
+            const currentValue = selectEl.value; // Mevcut seçimi sakla
+            
+            selectEl.innerHTML = ''; // Listeyi temizle
+            
+            liabilityOptions[type].forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.text;
+                selectEl.appendChild(option);
+            });
+
+            // Eğer önceki seçim yeni listede de varsa (örn: standart_mevduat), onu seçili bırak
+            if (liabilityOptions[type].some(opt => opt.value === currentValue)) {
+                selectEl.value = currentValue;
+            } else {
+                // Yoksa (örn: TL'ye geçildiğinde kıymetli maden yoksa), ilk seçeneği seç
+                selectEl.selectedIndex = 0;
+            }
+        };
+
+        // KAPSAMI GENİŞLETİLMİŞ ZK ORANI MATRİSİ 
+        const getZkRate = (days, currency, liabilityType) => {
+            if (liabilityType === 'standart_mevduat') {
+                if (currency === 'tl') return days <= 91 ? 17 : 10;
+                if (currency === 'yp') return days <= 31 ? 32 : 28;
+            } 
+            else if (liabilityType === 'kiymetli_maden') {
+                return days <= 31 ? 32 : 28; 
+            } 
+            else if (liabilityType === 'yurtici_bankalar' || liabilityType === 'kamu_haznedarligi') {
+                // Hem TL hem YP için muafiyet (ZK = %0)
+                return 0;
+            }
+            else if (liabilityType === 'yurtici_repo') {
+                if (currency === 'yp') {
+                    if (days <= 364) return 25;
+                    if (days <= 730) return 10;
+                    if (days <= 1095) return 8;
+                    if (days <= 1825) return 3;
+                    return 0;
+                } else { // TL Yurtiçi Repo
+                    if (days <= 364) return 8;
+                    if (days <= 1094) return 5.5;
+                    return 3;
+                }
+            } 
+            else if (liabilityType === 'yurtdisi_banka_mevduati') {
+                if (currency === 'tl') {
+                    if (days <= 364) return 14;
+                    if (days <= 1095) return 5.5;
+                    return 3;
+                } else { // YP
+                    if (days <= 364) return 21;
+                    if (days <= 730) return 10;
+                    if (days <= 1095) return 8;
+                    if (days <= 1825) return 3;
+                    return 0;
+                }
+            } 
+            else if (liabilityType === 'yurtdisi_repo_kredi') {
+                if (currency === 'tl') {
+                    if (days <= 31) return 20;
+                    if (days <= 91) return 16;
+                    if (days <= 364) return 14;
+                    if (days <= 1094) return 5.5;
+                    return 3;
+                } else { // YP 
+                    if (days <= 364) return 21;
+                    if (days <= 730) return 10;
+                    if (days <= 1095) return 8;
+                    if (days <= 1825) return 3;
+                    return 0;
+                }
+            } 
+            else if (liabilityType === 'diger') {
+                if (currency === 'tl') {
+                    if (days <= 364) return 8;
+                    if (days <= 1094) return 5.5;
+                    return 3;
+                } else { // YP
+                    if (days <= 364) return 21;
+                    if (days <= 730) return 10;
+                    if (days <= 1095) return 8;
+                    if (days <= 1825) return 3;
+                    return 0;
+                }
+            }
+            return 0; 
+        };
+
+        // YENİ: Seçilen Yükümlülük Türüne Göre Dinamik ZK Tablosu Çizici
+        const renderZkTable = () => {
+            const type = document.getElementById('liabilityType').value;
+            const tbody = document.getElementById('zkTableBody');
+            const title = document.getElementById('zkTableTitle');
+            const footnotes = document.getElementById('zkTableFootnotes');
+            
+            tbody.innerHTML = ''; // Tabloyu temizle
+            let tableData = [];
+
+            // Tablo Başlığı ve Dipnot Görünürlüğü
+            if (type === 'standart_mevduat') {
+                title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Standart Mevduat ZK Oranları(*)(**)';
+                footnotes.style.display = 'block';
+                tableData = [
+                    { vade: 'Vadesiz - 31 Gün', tl: 17, yp: 32 },
+                    { vade: '32 - 91 Gün', tl: 17, yp: 28 },
+                    { vade: '92 Gün ve Üzeri', tl: 10, yp: 28 }
+                ];
+            } else {
+                footnotes.style.display = 'none'; // Diğer türlerde dipnotu gizle
+                
+                if (type === 'kiymetli_maden') {
+                    title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Kıymetli Maden ZK Oranları';
+                    tableData = [
+                        { vade: 'Vadesiz - 31 Gün', tl: '-', yp: 32 },
+                        { vade: '32 Gün ve Üzeri', tl: '-', yp: 28 }
+                    ];
+                } else if (type === 'yurtici_bankalar' || type === 'kamu_haznedarligi') {
+                    title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Muaf Yükümlülükler';
+                    tableData = [
+                        { vade: 'Tüm Vadeler', tl: 0, yp: 0 }
+                    ];
+                } else if (type === 'yurtici_repo') {
+                    title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Yurtiçi Repo ZK Oranları';
+                    tableData = [
+                        { vade: '0 - 364 Gün', tl: 8, yp: 25 },
+                        { vade: '365 - 730 Gün', tl: 5.5, yp: 10 },
+                        { vade: '731 - 1094 Gün', tl: 5.5, yp: 8 },
+                        { vade: '1095 - 1825 Gün', tl: 3, yp: 3 },
+                        { vade: '1826 Gün ve Üzeri', tl: 3, yp: 0 }
+                    ];
+                } else if (type === 'yurtdisi_banka_mevduati') {
+                    title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Yurtdışı Banka Mevduatı ZK Oranları';
+                    tableData = [
+                        { vade: '0 - 364 Gün', tl: 14, yp: 21 },
+                        { vade: '365 - 730 Gün', tl: 5.5, yp: 10 },
+                        { vade: '731 - 1095 Gün', tl: 5.5, yp: 8 },
+                        { vade: '1096 - 1825 Gün', tl: 3, yp: 3 },
+                        { vade: '1826 Gün ve Üzeri', tl: 3, yp: 0 }
+                    ];
+                } else if (type === 'yurtdisi_repo_kredi') {
+                    title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Yurtdışı Repo/Kredi ZK Oranları';
+                    tableData = [
+                        { vade: '0 - 31 Gün', tl: 20, yp: 21 },
+                        { vade: '32 - 91 Gün', tl: 16, yp: 21 },
+                        { vade: '92 - 364 Gün', tl: 14, yp: 21 },
+                        { vade: '365 - 730 Gün', tl: 5.5, yp: 10 },
+                        { vade: '731 - 1094 Gün', tl: 5.5, yp: 8 },
+                        { vade: '1095 - 1825 Gün', tl: 3, yp: 3 },
+                        { vade: '1826 Gün ve Üzeri', tl: 3, yp: 0 }
+                    ];
+                } else if (type === 'diger') {
+                    title.innerHTML = '<i class="fa-solid fa-circle-info text-blue-500 mr-1.5"></i> Diğer Yükümlülükler ZK Oranları';
+                    tableData = [
+                        { vade: '0 - 364 Gün', tl: 8, yp: 21 },
+                        { vade: '365 - 730 Gün', tl: 5.5, yp: 10 },
+                        { vade: '731 - 1094 Gün', tl: 5.5, yp: 8 },
+                        { vade: '1095 - 1825 Gün', tl: 3, yp: 3 },
+                        { vade: '1826 Gün ve Üzeri', tl: 3, yp: 0 }
+                    ];
+                }
+            }
+
+            // Oluşturulan veriyi HTML tablosuna bas
+            tableData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-1.5 px-2">${row.vade}</td>
+                    <td class="py-1.5 px-2 text-center font-semibold ${row.tl === 0 ? 'text-emerald-600' : (row.tl === '-' ? 'text-gray-400' : 'text-slate-700')}">${row.tl !== '-' ? row.tl : '-'}</td>
+                    <td class="py-1.5 px-2 text-center font-semibold ${row.yp === 0 ? 'text-emerald-600' : (row.yp === '-' ? 'text-gray-400' : (type==='standart_mevduat' && row.yp===32 ? 'text-red-600' : 'text-slate-700'))}">${row.yp !== '-' ? row.yp : '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        const updateZkRate = () => {
+            const days = parseInt(document.getElementById('depDays').value) || 0;
+            const type = document.getElementById('liabilityType').value;
+            const newRate = getZkRate(days, currentDepositType, type);
+            
+            if (currentDepositType === 'tl') {
+                document.getElementById('depReserveRatioTL').value = newRate;
+            } else {
+                document.getElementById('depReserveRatioYP').value = newRate;
+            }
+        };
+
+        // YENİ DÜZENLENMİŞ STOPAJ ORANI KURAL MATRİSİ
+        const getTaxRate = (days, currency, liabilityType) => {
+            // 1. Standart Mevduat (Hem TL Hem YP aynı)
+            if (liabilityType === 'standart_mevduat') {
+                if (days <= 180) return 17.5;
+                if (days <= 365) return 15;
+                return 10; 
+            } 
+            // 2. Kıymetli Maden & Yurt İçi Repo
+            else if (liabilityType === 'kiymetli_maden' || liabilityType === 'yurtici_repo') {
+                return 15; 
+            } 
+            // 3. Diğer Tüm Yükümlülükler
+            else {
+                return 0; 
+            }
+        };
+
+        const updateTaxRate = () => {
+            const days = parseInt(document.getElementById('depDays').value) || 0;
+            const type = document.getElementById('liabilityType').value;
+            const newRate = getTaxRate(days, currentDepositType, type);
+            document.getElementById('depTax').value = newRate;
+        };
+
+        const switchTab = (type) => {
+            currentDepositType = type;
+            
+            document.getElementById('tab-tl-btn').className = type === 'tl' ? "tab-btn tab-active py-2 px-4 focus:outline-none flex-1 text-center" : "tab-btn tab-inactive py-2 px-4 focus:outline-none flex-1 text-center";
+            document.getElementById('tab-yp-btn').className = type === 'yp' ? "tab-btn tab-active py-2 px-4 focus:outline-none flex-1 text-center" : "tab-btn tab-inactive py-2 px-4 focus:outline-none flex-1 text-center";
+            
+            document.getElementById('tab-tl-content').classList.toggle('active', type === 'tl');
+            document.getElementById('tab-yp-content').classList.toggle('active', type === 'yp');
+            
+            document.getElementById('currency-symbol').textContent = type === 'tl' ? '₺' : '$';
+            
+            // Dropdown'ı sekme türüne göre yenile (Kıymetli Maden kontrolü vb.)
+            populateLiabilityDropdown(type);
+            
+            const badge = document.getElementById('active-currency-badge');
+            if (type === 'tl') {
+                badge.textContent = "TL Analizi";
+                badge.className = "px-2 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded";
+                document.getElementById('depInterest').value = 38; 
+            } else {
+                badge.textContent = "YP Analizi";
+                badge.className = "px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded";
+                document.getElementById('depInterest').value = 4; 
+            }
+
+            updateZkRate(); 
+            updateTaxRate(); 
+            calculateEAR();
+        };
+
+        const calculateEAR = () => {
+            const depositAmount = parseFloat(document.getElementById('depAmount').value);
+            const nominalRate = parseFloat(document.getElementById('depInterest').value) / 100;
+            const days = parseInt(document.getElementById('depDays').value);
+            const taxRate = parseFloat(document.getElementById('depTax').value) / 100;
+            const liabilityType = document.getElementById('liabilityType').value;
+            
+            let reserveRatio = 0;
+            let aofmRate = 0;
+            let ypCommision = 0;
+
+            if (currentDepositType === 'tl') {
+                reserveRatio = parseFloat(document.getElementById('depReserveRatioTL').value) / 100;
+                aofmRate = parseFloat(document.getElementById('depAofm').value) / 100;
+            } else {
+                reserveRatio = parseFloat(document.getElementById('depReserveRatioYP').value) / 100;
+                ypCommision = parseFloat(document.getElementById('depYpCommision').value) / 100;
+            }
+
+            if (isNaN(depositAmount) || isNaN(nominalRate) || isNaN(days) || isNaN(taxRate) || isNaN(reserveRatio) || days <= 0) return;
+
+            const grossPeriodRate = nominalRate * (days / 365);
+            const netPeriodRate = grossPeriodRate * (1 - taxRate);
+            const periodsPerYear = 365 / days;
+            const grossEar = Math.pow(1 + grossPeriodRate, periodsPerYear) - 1;
+            const netEar = Math.pow(1 + netPeriodRate, periodsPerYear) - 1;
+            
+            const netInterestAmount = depositAmount * netPeriodRate;
+            
+            let zkCostPercentBrut = 0;
+            let netZkCostPercent = 0;
+            let netZkYukuBilesik = 0;
+            
+            const infoBadge = document.getElementById('zk-info-badge');
+            const nemaCommBoxTitle = document.getElementById('nema-commission-title');
+            const nemaCommValue = document.getElementById('resZkNemaEtkisi');
+            const explanationText = document.getElementById('zk-explanation-text');
+
+            if (reserveRatio < 1 && reserveRatio > 0) {
+                 zkCostPercentBrut = (nominalRate / (1 - reserveRatio)) - nominalRate;
+                 let zkCostPercentBrutBilesik = (grossEar / (1 - reserveRatio)) - grossEar;
+                 
+                 if (currentDepositType === 'tl') {
+                     // Bankalararası istisnası örnek amaçlı - Kendi tebliğinize göre 0 veya nemasız olabilir
+                     const nemaRate = aofmRate * 0.86;
+                     const zkNemaEffect = (reserveRatio * nemaRate) / (1 - reserveRatio);
+                     const zkNemaEffectBilesik = (Math.pow(1 + (nemaRate * (days/365)), periodsPerYear) -1) * reserveRatio / (1-reserveRatio);
+                     
+                     netZkCostPercent = zkCostPercentBrut - zkNemaEffect;
+                     netZkYukuBilesik = zkCostPercentBrutBilesik - zkNemaEffectBilesik;
+                     
+                     infoBadge.innerHTML = `Nema Oranı: <strong>%${(nemaRate * 100).toFixed(2)}</strong>`;
+                     infoBadge.className = "text-xs font-normal bg-orange-100 text-orange-800 px-2 py-1 rounded border border-orange-200";
+                     
+                     nemaCommBoxTitle.textContent = "Nema Getirisi Etkisi";
+                     nemaCommValue.textContent = '%-' + (zkNemaEffect * 100).toFixed(2);
+                     nemaCommValue.className = "text-xl font-bold text-emerald-500";
+                     
+                     explanationText.innerHTML = `<strong>Net ZK Yükü:</strong> Bankanın brüt fonlama maliyetine ZK nedeniyle eklenen oransal yüktür. TL ZK'ya ödenen nema, kullanılamayan tutarın yarattığı maliyeti kısmen telafi eder. <br><span class="inline-block mt-1 bg-white px-2 py-1 rounded border border-gray-100">Formül: <code>(Faiz Oranı - (ZK Oranı * Nema Oranı)) / (1 - ZK Oranı) - Faiz Oranı</code></span>`;
+
+                 } else {
+                     const zkCommisionEffect = (reserveRatio * ypCommision) / (1 - reserveRatio);
+                     const zkCommisionEffectBilesik = (Math.pow(1 + (ypCommision * (days/365)), periodsPerYear) -1) * reserveRatio / (1-reserveRatio);
+                     
+                     netZkCostPercent = zkCostPercentBrut + zkCommisionEffect; 
+                     netZkYukuBilesik = zkCostPercentBrutBilesik + zkCommisionEffectBilesik;
+                     
+                     infoBadge.innerHTML = `Komisyon Gideri: <strong>%${(ypCommision * 100).toFixed(2)}</strong>`;
+                     infoBadge.className = "text-xs font-normal bg-red-100 text-red-800 px-2 py-1 rounded border border-red-200";
+                     
+                     nemaCommBoxTitle.textContent = "Komisyon Etkisi";
+                     nemaCommValue.textContent = '%+' + (zkCommisionEffect * 100).toFixed(2);
+                     nemaCommValue.className = "text-xl font-bold text-red-500";
+                     
+                     explanationText.innerHTML = `<strong>Net ZK Yükü:</strong> Bankanın YP fonlama maliyetine ZK nedeniyle eklenen oransal yüktür. YP blokesinden gelir elde edilmediği gibi, varsa TCMB komisyonu maliyeti daha da artırır. <br><span class="inline-block mt-1 bg-white px-2 py-1 rounded border border-gray-100">Formül: <code>(Faiz Oranı + (ZK Oranı * Komisyon Oranı)) / (1 - ZK Oranı) - Faiz Oranı</code></span>`;
+                 }
+            } else {
+                infoBadge.innerHTML = `Nema/Komisyon: <strong>Muaf / Yok</strong>`;
+                infoBadge.className = "text-xs font-normal bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-200";
+                nemaCommValue.textContent = '%0.00';
+                nemaCommValue.className = "text-xl font-bold text-gray-400";
+            }
+
+            document.getElementById('resGrossPeriodRate').textContent = '%' + (grossPeriodRate * 100).toFixed(2);
+            document.getElementById('resNetPeriodRate').textContent = '%' + (netPeriodRate * 100).toFixed(2);
+            document.getElementById('resPeriodTextDays').textContent = days;
+            document.getElementById('resNetInterestAmount').textContent = formatCurrency(netInterestAmount);
+            document.getElementById('resGrossEarRate').textContent = '%' + (grossEar * 100).toFixed(2);
+            document.getElementById('resNetEarRate').textContent = '%' + (netEar * 100).toFixed(2);
+
+            document.getElementById('resZkMaliyetBrut').textContent = '%+' + (zkCostPercentBrut * 100).toFixed(2);
+            
+            const netCostEl = document.getElementById('resZkMaliyetNet');
+            netCostEl.textContent = '%' + (netZkCostPercent > 0 ? '+' : '') + (netZkCostPercent * 100).toFixed(2);
+            if(netZkCostPercent > 0) {
+                netCostEl.className = "text-2xl font-black text-red-700";
+            } else if (netZkCostPercent < 0) {
+                netCostEl.className = "text-2xl font-black text-emerald-700";
+            } else {
+                netCostEl.className = "text-2xl font-black text-gray-500";
+            }
+            
+            let toplamBasitMaliyet = (nominalRate + netZkCostPercent) * 100;
+            let toplamBilesikMaliyet = (grossEar + netZkYukuBilesik) * 100;
+
+            document.getElementById('resTotalSimpleCost').innerText = "%" + toplamBasitMaliyet.toFixed(2);
+            document.getElementById('resTotalEarCost').innerText = "%" + toplamBilesikMaliyet.toFixed(2);
+        };
+
+        const depositInputs = ['depAmount', 'depInterest', 'depTax', 'depReserveRatioTL', 'depAofm', 'depReserveRatioYP', 'depYpCommision'];
+        depositInputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('input', calculateEAR);
+        });
+
+        document.getElementById('depDays').addEventListener('input', () => {
+            updateZkRate();
+            updateTaxRate();
+            calculateEAR();
+        });
+
+        document.getElementById('liabilityType').addEventListener('change', () => {
+            updateZkRate();
+            updateTaxRate();
+            calculateEAR();
+            renderZkTable(); // Tabloyu güncelle
+        });
+
+        document.getElementById('exportDepositBtn').addEventListener('click', () => {
+            const liabilitySelect = document.getElementById('liabilityType');
+            const liabilityLabel = liabilitySelect.options[liabilitySelect.selectedIndex].text;
+            
+            const depAmount = document.getElementById('depAmount').value;
+            const depInterest = document.getElementById('depInterest').value;
+            const depDays = document.getElementById('depDays').value;
+            const depTax = document.getElementById('depTax').value;
+            
+            const isTL = currentDepositType === 'tl';
+            const currencyLabel = isTL ? 'TL' : 'YP';
+            const reserveRatio = isTL ? document.getElementById('depReserveRatioTL').value : document.getElementById('depReserveRatioYP').value;
+            const extraCostRate = isTL ? document.getElementById('depAofm').value : document.getElementById('depYpCommision').value;
+            const extraCostLabel = isTL ? 'AOFM (%)' : 'YP ZK Komisyonu (%)';
+
+            const grossPeriod = document.getElementById('resGrossPeriodRate').innerText;
+            const netPeriod = document.getElementById('resNetPeriodRate').innerText;
+            const netInterestAmount = document.getElementById('resNetInterestAmount').innerText;
+            const grossEar = document.getElementById('resGrossEarRate').innerText;
+            const netEar = document.getElementById('resNetEarRate').innerText;
+            
+            const zkBrut = document.getElementById('resZkMaliyetBrut').innerText;
+            const zkEffect = document.getElementById('resZkNemaEtkisi').innerText;
+            const zkNet = document.getElementById('resZkMaliyetNet').innerText;
+            
+            const totalSimpleCost = document.getElementById('resTotalSimpleCost').innerText;
+            const totalEarCost = document.getElementById('resTotalEarCost').innerText;
+
+            const depositData = [
+                { "Parametre": "Para Birimi / Tür", "Değer": currencyLabel },
+                { "Parametre": "Yükümlülük Türü", "Değer": liabilityLabel },
+                { "Parametre": "Tutar", "Değer": Number(depAmount) },
+                { "Parametre": "Yıllık Nominal Maliyet (%)", "Değer": Number(depInterest) },
+                { "Parametre": "Vade (Gün)", "Değer": Number(depDays) },
+                { "Parametre": "Stopaj (%)", "Değer": Number(depTax) },
+                { "Parametre": "ZK Oranı (%)", "Değer": Number(reserveRatio) },
+                { "Parametre": extraCostLabel, "Değer": Number(extraCostRate) },
+                { "Parametre": "", "Değer": "" }, 
+                { "Parametre": "SONUÇLAR", "Değer": "" },
+                { "Parametre": "Dönemlik Brüt Getiri", "Değer": grossPeriod },
+                { "Parametre": "Dönemlik Net Getiri", "Değer": netPeriod },
+                { "Parametre": "Dönemlik Net Getiri Tutarı", "Değer": netInterestAmount },
+                { "Parametre": "Efektif Yıllık Brüt Getiri", "Değer": grossEar },
+                { "Parametre": "Efektif Yıllık Net Getiri", "Değer": netEar },
+                { "Parametre": "", "Değer": "" }, 
+                { "Parametre": "ZK ETKİSİ", "Değer": "" },
+                { "Parametre": "Brüt ZK Yükü", "Değer": zkBrut },
+                { "Parametre": isTL ? "Nema Getirisi Etkisi" : "Komisyon Etkisi", "Değer": zkEffect },
+                { "Parametre": "Net ZK Yükü", "Değer": zkNet },
+                { "Parametre": "", "Değer": "" },
+                { "Parametre": "NİHAİ MALİYET (HAZİNE)", "Değer": "" },
+                { "Parametre": "Toplam Basit Maliyet", "Değer": totalSimpleCost },
+                { "Parametre": "Toplam Bileşik Maliyet (EAR)", "Değer": totalEarCost }
+            ];
+
+            const workbook = XLSX.utils.book_new();
+            const worksheetDeposit = XLSX.utils.json_to_sheet(depositData);
+            
+            worksheetDeposit['!cols'] = [{ wch: 30 }, { wch: 25 }];
+
+            XLSX.utils.book_append_sheet(workbook, worksheetDeposit, "Yükümlülük Analizi");
+            XLSX.writeFile(workbook, "Maliyet_Analizi_Raporu.xlsx");
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            populateLiabilityDropdown(currentDepositType); // Başlangıçta dropdown'ı doldur
+            updateZkRate(); 
+            updateTaxRate(); 
+            calculateEAR();
+            renderZkTable(); // Başlangıçta tabloyu doldur
+        });
+    </script>
+</body>
+</html>
